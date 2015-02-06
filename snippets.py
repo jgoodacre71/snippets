@@ -19,7 +19,7 @@ def get(name):
     Returns the snippet.
     """
     logging.error("FIXME: Unimplemented - get({!r})".format(name))
-    return ""
+    return name
 
 def main():
     """Main function"""
@@ -35,8 +35,36 @@ def main():
     put_parser.add_argument("name", help="The name of the snippet")
     put_parser.add_argument("snippet", help="The snippet text")
 
+    # Subparser for the get command
+    logging.debug("Constructing get subparser")
 
+    get_parser = subparsers.add_parser("get", help="Retreive a snippet")
+    get_parser.add_argument("name", help="The name of the snippet")
+    
     arguments = parser.parse_args(sys.argv[1:])
+    
+    # Convert parsed arguments from Namespace to dictionary
+    arguments = vars(arguments)
+    command = arguments.pop("command")
+
+    if command == "put":
+        name, snippet = put(**arguments)
+        print("Stored {!r} as {!r}".format(snippet, name))
+    elif command == "get":
+        snippet = get(**arguments)
+        print("Retrieved snippet: {!r}".format(snippet))
+        
+        
+    # Code without argument unpacking
+    #put(name="list", snippet="A sequence of things - created using []")
+
+    # Identical code which uses argument unpacking
+    #arguments = {
+    #    "name": "list",
+    #    "snippet": "A sequence of things - created using []"
+    #}
+    #put(**arguments)
+    
 
 if __name__ == "__main__":
     main()
