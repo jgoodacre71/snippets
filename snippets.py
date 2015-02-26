@@ -15,14 +15,15 @@ logging.debug("Database connection established.")
 def put(name, snippet):
     """Store a snippet with an associated name."""
     logging.info("Storing snippet {!r}: {!r}".format(name, snippet))
-    cursor = connection.cursor()
-    try:
-        command = "insert into snippets values (%s, %s)"
-        cursor.execute(command, (name, snippet))
-    except psycopg2.IntegrityError as e:
-        connection.rollback()
-        command = "update snippets set message=%s where keyword=%s"
-        cursor.execute(command, (snippet, name))
+    
+    with connection, connection.cursor() as cursor:
+        try:
+            command = "insert into snippets values (%s, %s)"
+            cursor.execute(command, (name, snippet))
+        except psycopg2.IntegrityError as e:
+            connection.rollback()
+            command = "update snippets set message=%s where keyword=%s"
+            cursor.execute(command, (snippet, name))
     connection.commit()
     logging.debug("Snippet stored successfully.")
     return name, snippet
@@ -31,10 +32,10 @@ def put(name, snippet):
 def get(name):   
     """Retrieve a snippet with an associated name."""
     logging.info("Retrieving snippet with name {!r}".format(name))
-    cursor = connection.cursor()
-    command = "select message from snippets where keyword= '{}'".format(name)
-    cursor.execute(command)
-    snippet = cursor.fetchone() 
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select message from snippets where keyword=%s", (name,))
+        snippet = cursor.fetchone()
+    
     logging.debug("Snippet retreived successfully.")
     if not snippet:
         # No snippet was found with that name.
@@ -42,7 +43,32 @@ def get(name):
         return 'N/A'
     else:
         return snippet[0]
+    
+def catalog():   
+    """Retrieve available keywords"""
+    logging.info("Retrieving catalog")
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select keyword from snippets order by keyword")
+        cat_keywords = cursor.fetchall()
+    
+    logging.debug("catalog retreived successfully.")
+    return cat_keywords
 
+def search(fragment):   
+    """Retrieve snippet containing the fragment."""
+    logging.info("Retrieving snippet with fragment {!r}".format(fragment))
+    print "select message from snippets where keyword like {!r}".format('%'+fragment+'%')
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select message from snippets where message like {!r}".format('%'+fragment+'%'))
+        snippet = cursor.fetchall()
+    
+    logging.debug("Snippets retreived successfully.")
+    if not snippet:
+        # No snippet was found with that name.
+        print "Warning no snippets found"
+        return 'N/A'
+    else:
+        return snippet
 
 def main():
     """Main function"""
@@ -64,6 +90,16 @@ def main():
     get_parser = subparsers.add_parser("get", help="Retreive a snippet")
     get_parser.add_argument("name", help="The name of the snippet")
     
+    # Subparser for the catalog command
+    logging.debug("Constructing catalog subparser")
+    get_parser = subparsers.add_parser("catalog", help="Return available keywords")
+    
+    # Subparser for the search command
+    logging.debug("Constructing search subparser")
+
+    get_parser = subparsers.add_parser("search", help="Retreive snippets with a fragment")
+    get_parser.add_argument("fragment", help="The fragment")
+    
     arguments = parser.parse_args(sys.argv[1:])
     
     # Convert parsed arguments from Namespace to dictionary
@@ -76,6 +112,14 @@ def main():
     elif command == "get":
         snippet = get(**arguments)
         print("Retrieved snippet: {!r}".format(snippet))
+    elif command == "catalog":
+        cat_items = catalog()
+        for item in cat_items:
+            print("Catalog item: {!r}".format(item[0]))
+    elif command == "search":
+        snippets = search(**arguments)
+        for item in snippets:
+            print("retreived snippet: {!r}".format(item[0]))
         
         
     # Code without argument unpacking
